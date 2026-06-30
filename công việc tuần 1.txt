@@ -50,7 +50,7 @@ Ngày 4: Nghiên cứu Modbus
 - Tìm hiểu giao thức Modbus.
 - Phân biệt Modbus RTU và Modbus TCP.
 - Tìm hiểu các khái niệm Master, Slave, Coil và Register.
-- Nghiên cứu ứng dụng Modbus trong hệ thống AI Vision và PLC công nghiệp.
+- Nghiên cứu ứng dụng Modbus trong hệ thống AI Vision.
 Kết quả mong đợi
 - Hiểu cơ chế truyền dữ liệu của Modbus.
 - Hiểu cách AI Vision giao tiếp với PLC thông qua Modbus TCP.
