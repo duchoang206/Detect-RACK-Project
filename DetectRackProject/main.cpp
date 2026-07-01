@@ -65,11 +65,41 @@ void runInference(YOLOv8Detector* detector) {
     }
 }
 
-// Hàm callback sự kiện chuột chuyển tiếp tới RegionMonitor
+// Hàm gửi báo cáo lên Server khi trạng thái thay đổi
+void reportToServer(const std::string& roiName, bool hasRack) {
+    // Hàm mẫu để bạn kết nối Socket, HTTP API hoặc Modbus TCP gửi dữ liệu về Server sau này
+    std::cout << "\n[SERVER REPORT] " << roiName << " state changed: " 
+              << (hasRack ? "RACK DETECTED (OCCUPIED)" : "NO RACK (EMPTY)") << std::endl;
+}
+
+// Cấu trúc dùng làm công cụ phụ trợ lấy tọa độ mới bằng chuột
+struct MouseCallbackParams {
+    cv::Rect box;
+    bool drawing = false;
+};
+
 void onMouse(int event, int x, int y, int flags, void* userdata) {
-    auto* monitor = reinterpret_cast<RegionMonitor*>(userdata);
-    if (monitor) {
-        monitor->handleMouseCallback(event, x, y, flags);
+    auto* params = reinterpret_cast<MouseCallbackParams*>(userdata);
+    if (!params) return;
+    if (event == cv::EVENT_LBUTTONDOWN) {
+        params->drawing = true;
+        params->box = cv::Rect(x, y, 0, 0);
+    } else if (event == cv::EVENT_MOUSEMOVE && params->drawing) {
+        params->box.width = x - params->box.x;
+        params->box.height = y - params->box.y;
+    } else if (event == cv::EVENT_LBUTTONUP && params->drawing) {
+        params->drawing = false;
+        if (params->box.width < 0) {
+            params->box.x += params->box.width;
+            params->box.width = -params->box.width;
+        }
+        if (params->box.height < 0) {
+            params->box.y += params->box.height;
+            params->box.height = -params->box.height;
+        }
+        std::cout << "[Config Helper] Drawn Box: cv::Rect(" 
+                  << params->box.x << ", " << params->box.y << ", " 
+                  << params->box.width << ", " << params->box.height << ")" << std::endl;
     }
 }
 
@@ -96,12 +126,32 @@ int main(int argc, char* argv[]) {
     // Khởi động luồng xử lý AI (Thread 2)
     std::thread infThread(runInference, &detector);
 
-    // Cấu hình giao diện và RegionMonitor
-    std::string winName = "DetectRackProject - Custom ROI Demo";
+    // Cấu hình giao diện GUI
+    std::string winName = "DetectRackProject - Predefined ROI Demo";
     cv::namedWindow(winName, cv::WINDOW_AUTOSIZE);
 
-    RegionMonitor monitor;
-    cv::setMouseCallback(winName, onMouse, &monitor);
+    // Đăng ký chuột để làm công cụ phụ lấy tọa độ khi cần cấu hình lại
+    MouseCallbackParams mouseParams;
+    cv::setMouseCallback(winName, onMouse, &mouseParams);
+
+    // Định cấu hình 2 vùng ROI giám sát mặc định
+    cv::Rect roiRect1(1160, 390, 390, 200); // ROI 1 (phía phải dưới camera)
+    cv::Rect roiRect2(760, 390, 380, 200);  // ROI 2 (ở giữa cạnh ROI 1)
+
+    // Khởi tạo 2 monitor tương ứng để quản lý va chạm
+    RegionMonitor monitor1;
+    monitor1.handleMouseCallback(cv::EVENT_LBUTTONDOWN, roiRect1.x, roiRect1.y, 0);
+    monitor1.handleMouseCallback(cv::EVENT_MOUSEMOVE, roiRect1.x + roiRect1.width, roiRect1.y + roiRect1.height, 0);
+    monitor1.handleMouseCallback(cv::EVENT_LBUTTONUP, roiRect1.x + roiRect1.width, roiRect1.y + roiRect1.height, 0);
+
+    RegionMonitor monitor2;
+    monitor2.handleMouseCallback(cv::EVENT_LBUTTONDOWN, roiRect2.x, roiRect2.y, 0);
+    monitor2.handleMouseCallback(cv::EVENT_MOUSEMOVE, roiRect2.x + roiRect2.width, roiRect2.y + roiRect2.height, 0);
+    monitor2.handleMouseCallback(cv::EVENT_LBUTTONUP, roiRect2.x + roiRect2.width, roiRect2.y + roiRect2.height, 0);
+
+    // Lưu trạng thái trước đó để chỉ gửi báo cáo khi trạng thái thay đổi
+    bool prevOccupied1 = false;
+    bool prevOccupied2 = false;
 
     cv::Mat frame, outputFrame;
     double fps = 0.0;
@@ -113,7 +163,7 @@ int main(int argc, char* argv[]) {
         if (camera.retrieveFrame(frame)) {
             frame.copyTo(outputFrame);
 
-            // Gửi khung hình thô sang luồng nhận diện ngầm (cực kỳ nhanh, không block GUI)
+            // Gửi khung hình thô sang luồng nhận diện ngầm
             {
                 std::lock_guard<std::mutex> lock(g_mutex);
                 g_inferenceFrame = frame;
@@ -145,21 +195,43 @@ int main(int argc, char* argv[]) {
                 }
             }
 
-            // Kiểm tra va chạm bằng RegionMonitor và vẽ giao diện tùy chỉnh
-            bool isOccupied = monitor.checkIntersection(validDets);
-            
-            // Vẽ hộp giám sát vẽ bằng chuột (Đỏ nếu có rack, Xanh lá nếu an toàn)
-            cv::Rect roi = monitor.getROI();
-            if (roi.width > 0 && roi.height > 0) {
-                cv::Scalar boxColor = isOccupied ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0);
-                cv::rectangle(outputFrame, roi, boxColor, 2);
-                
-                std::string statusText = isOccupied ? "STATUS: OCCUPIED (RACK IN ZONE)" : "STATUS: SAFE (EMPTY)";
-                cv::Scalar textColor = isOccupied ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0);
-                cv::putText(outputFrame, statusText, cv::Point(30, 40), cv::FONT_HERSHEY_SIMPLEX, 0.8, textColor, 2);
-            } else {
-                cv::putText(outputFrame, "Dung chuot trai keo de ve vung can giam sat...", 
-                            cv::Point(30, 40), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 1);
+            // Kiểm tra va chạm cho từng ROI sử dụng đối tượng RegionMonitor tương ứng
+            bool isOccupied1 = monitor1.checkIntersection(validDets);
+            bool isOccupied2 = monitor2.checkIntersection(validDets);
+
+            // Báo cáo thay đổi trạng thái lên Server
+            if (isOccupied1 != prevOccupied1) {
+                reportToServer("ROI1", isOccupied1);
+                prevOccupied1 = isOccupied1;
+            }
+            if (isOccupied2 != prevOccupied2) {
+                reportToServer("ROI2", isOccupied2);
+                prevOccupied2 = isOccupied2;
+            }
+
+            // Vẽ hộp ROI 1 (Đỏ nếu có rack, Xanh lá nếu trống)
+            cv::Rect r1 = monitor1.getROI();
+            cv::Scalar color1 = isOccupied1 ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0);
+            cv::rectangle(outputFrame, r1, color1, 2);
+            cv::putText(outputFrame, "ROI 1", cv::Point(r1.x + 5, r1.y + 20), cv::FONT_HERSHEY_SIMPLEX, 0.6, color1, 2);
+
+            // Vẽ hộp ROI 2 (Đỏ nếu có rack, Xanh lá nếu trống)
+            cv::Rect r2 = monitor2.getROI();
+            cv::Scalar color2 = isOccupied2 ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0);
+            cv::rectangle(outputFrame, r2, color2, 2);
+            cv::putText(outputFrame, "ROI 2", cv::Point(r2.x + 5, r2.y + 20), cv::FONT_HERSHEY_SIMPLEX, 0.6, color2, 2);
+
+            // Hiển thị trạng thái của cả 2 ROI ở góc trên bên trái
+            std::string statusText1 = "ROI 1: " + std::string(isOccupied1 ? "OCCUPIED (RACK IN ZONE)" : "SAFE (EMPTY)");
+            std::string statusText2 = "ROI 2: " + std::string(isOccupied2 ? "OCCUPIED (RACK IN ZONE)" : "SAFE (EMPTY)");
+            cv::putText(outputFrame, statusText1, cv::Point(30, 40), cv::FONT_HERSHEY_SIMPLEX, 0.75, color1, 2);
+            cv::putText(outputFrame, statusText2, cv::Point(30, 70), cv::FONT_HERSHEY_SIMPLEX, 0.75, color2, 2);
+
+            // Vẽ hộp đang vẽ dở bằng chuột (Công cụ đo đạc phụ trợ)
+            if (mouseParams.drawing || (mouseParams.box.width > 0 && mouseParams.box.height > 0)) {
+                cv::rectangle(outputFrame, mouseParams.box, cv::Scalar(0, 255, 255), 1, cv::LINE_8);
+                cv::putText(outputFrame, "Temp Box", cv::Point(mouseParams.box.x, mouseParams.box.y - 5),
+                            cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 255), 1);
             }
 
             // Hiển thị FPS
