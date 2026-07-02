@@ -466,10 +466,10 @@
         // Garbage collection helper for real-time video stream
         let currentObjectUrl = null;
 
-        // 1. Thay vì fix cứng IP, dòng này giúp trình duyệt tự bốc IP của máy bạn (192.168.5.101) từ thanh URL
-        const SERVER_IP = window.location.hostname || '127.0.0.1'; 
+        // Tự động nhận diện IP của máy chủ hoặc fallback về IP Wi-Fi của máy chạy AI (192.168.5.103)
+        const SERVER_IP = window.location.hostname || '192.168.5.103'; 
 
-        // 2. Sửa đường dẫn kết nối WebSocket đến C++ Server chạy ở cổng 8082 (Bắt buộc dùng dấu nháy ngược ` )
+        // Sửa đường dẫn kết nối WebSocket đến C++ Server chạy ở cổng 8082
         const wsUrl = `ws://${SERVER_IP}:8082`;
 
         let socket = null;
