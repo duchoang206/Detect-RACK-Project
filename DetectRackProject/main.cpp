@@ -11,6 +11,8 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <iomanip>
+#include <sstream>
 
 // Networking Headers
 #include <ixwebsocket/IXNetSystem.h>
@@ -54,6 +56,10 @@ std::mutex g_alarmMutex;
 bool roi_1_alarm = false;
 bool roi_2_alarm = false;
 
+// --- Lịch sử phát hiện Rack ---
+std::mutex g_historyMutex;
+std::vector<std::string> g_entryHistory;
+
 // --- Vùng đệm chia sẻ (Camera -> AI & WS) ---
 std::mutex g_bufferMutex;
 cv::Mat g_sharedFrame;
@@ -69,6 +75,23 @@ std::mutex g_wsClientsMutex;
 std::set<std::shared_ptr<ix::WebSocket>> g_wsClients;
 
 std::atomic<bool> g_running(true);
+
+// Hàm lấy mốc thời gian hiện tại chính xác đến từng giây
+std::string getCurrentTimestamp() {
+  auto now = std::chrono::system_clock::now();
+  auto in_time_t = std::chrono::system_clock::to_time_t(now);
+  std::stringstream ss;
+#ifdef _WIN32
+  struct tm buf;
+  localtime_s(&buf, &in_time_t);
+  ss << std::put_time(&buf, "%Y-%m-%d %H:%M:%S");
+#else
+  struct tm buf;
+  localtime_r(&in_time_t, &buf);
+  ss << std::put_time(&buf, "%Y-%m-%d %H:%M:%S");
+#endif
+  return ss.str();
+}
 
 // Lọc các vùng phát hiện rack hợp lệ (tránh AGV di chuyển ở phần ngoài)
 bool isValidRackArea(const cv::Rect &box) {
@@ -193,10 +216,24 @@ void aiCoreThreadFunc(YOLOv8Detector *detector, RegionMonitor *monitor1,
 
       if (isOccupied1 != prevOccupied1) {
         reportToServer("ROI1", isOccupied1);
+        if (isOccupied1) {
+          std::lock_guard<std::mutex> lock(g_historyMutex);
+          if (g_entryHistory.size() >= 20) {
+            g_entryHistory.clear();
+          }
+          g_entryHistory.push_back("ROI 1 | " + getCurrentTimestamp());
+        }
         prevOccupied1 = isOccupied1;
       }
       if (isOccupied2 != prevOccupied2) {
         reportToServer("ROI2", isOccupied2);
+        if (isOccupied2) {
+          std::lock_guard<std::mutex> lock(g_historyMutex);
+          if (g_entryHistory.size() >= 20) {
+            g_entryHistory.clear();
+          }
+          g_entryHistory.push_back("ROI 2 | " + getCurrentTimestamp());
+        }
         prevOccupied2 = isOccupied2;
       }
 
@@ -270,9 +307,21 @@ void websocketThreadFunc() {
       r2 = roi_2_alarm;
     }
 
+    std::string historyJson = "";
+    {
+      std::lock_guard<std::mutex> lock(g_historyMutex);
+      for (size_t i = 0; i < g_entryHistory.size(); ++i) {
+        historyJson += "\"" + g_entryHistory[i] + "\"";
+        if (i + 1 < g_entryHistory.size()) {
+          historyJson += ", ";
+        }
+      }
+    }
+
     std::string jsonStr =
         "{\"roi_1_alarm\": " + std::string(r1 ? "true" : "false") +
-        ", \"roi_2_alarm\": " + std::string(r2 ? "true" : "false") + "}";
+        ", \"roi_2_alarm\": " + std::string(r2 ? "true" : "false") +
+        ", \"history\": [" + historyJson + "]}";
 
     cv::Mat localFrame;
     {

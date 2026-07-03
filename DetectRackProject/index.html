@@ -260,12 +260,119 @@
             color: rgba(255, 255, 255, 0.3);
         }
 
+        /* Right column container */
+        .right-column {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: 100%;
+        }
+
         /* Status Box and Cards (Stacked Vertically on Desktop) */
         .status-box {
             display: flex;
             flex-direction: column;
             gap: 20px;
-            height: 100%;
+            flex: 1;
+        }
+
+        /* History Log Panel */
+        .history-panel {
+            flex: 1.2;
+            background: rgba(13, 16, 27, 0.4);
+            border: 1px solid var(--panel-border);
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            min-height: 200px;
+        }
+
+        .history-title {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            color: var(--accent-cyan);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 8px;
+            text-transform: uppercase;
+        }
+
+        .history-log {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding-right: 5px;
+        }
+
+        /* Scrollbar styling for history-log */
+        .history-log::-webkit-scrollbar {
+            width: 4px;
+        }
+        .history-log::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.01);
+        }
+        .history-log::-webkit-scrollbar-thumb {
+            background: rgba(6, 182, 212, 0.3);
+            border-radius: 2px;
+        }
+
+        .history-item {
+            background: rgba(255, 255, 255, 0.01);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 6px;
+            padding: 8px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .history-item.roi1 {
+            border-left: 3px solid var(--safe-color);
+            background: linear-gradient(90deg, rgba(16, 185, 129, 0.04), transparent);
+        }
+
+        .history-item.roi2 {
+            border-left: 3px solid var(--accent-cyan);
+            background: linear-gradient(90deg, rgba(6, 182, 212, 0.04), transparent);
+        }
+
+        .history-item .event-label {
+            font-weight: 600;
+        }
+        
+        .history-item.roi1 .event-label {
+            color: var(--safe-color);
+        }
+
+        .history-item.roi2 .event-label {
+            color: var(--accent-cyan);
+        }
+
+        .history-item .event-time {
+            opacity: 0.8;
+            color: var(--text-primary);
+        }
+
+        .history-empty {
+            text-align: center;
+            opacity: 0.5;
+            padding-top: 40px;
+            font-style: italic;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         .status {
@@ -490,10 +597,19 @@
                 </div>
             </div>
 
-            <!-- Right panel: Status Cards (Balanced layout side-by-side) -->
-            <div class="status-box">
-                <div id="roi1" class="status safe">ROI 1: SAFE</div>
-                <div id="roi2" class="status safe">ROI 2: SAFE</div>
+            <!-- Right panel: Status Cards & History Log -->
+            <div class="right-column">
+                <div class="status-box">
+                    <div id="roi1" class="status safe">ROI 1: SAFE</div>
+                    <div id="roi2" class="status safe">ROI 2: SAFE</div>
+                </div>
+
+                <div class="history-panel">
+                    <div class="history-title">LỊCH SỬ PHÁT HIỆN RACK</div>
+                    <div id="historyLog" class="history-log">
+                        <div class="history-empty">Chưa có dữ liệu ghi nhận...</div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -546,6 +662,36 @@
                         } else {
                             roi2Element.innerText = "ROI 2: SAFE";
                             roi2Element.className = "status safe";
+                        }
+
+                        // Cập nhật Lịch sử phát hiện Rack
+                        const historyLogElement = document.getElementById("historyLog");
+                        if (data.history && data.history.length > 0) {
+                            historyLogElement.innerHTML = "";
+                            // Ta hiển thị bản ghi mới nhất lên đầu danh sách
+                            for (let i = data.history.length - 1; i >= 0; i--) {
+                                const record = data.history[i];
+                                const parts = record.split(" | ");
+                                const label = parts[0] || "ROI";
+                                const timeVal = parts[1] || "";
+                                
+                                const itemDiv = document.createElement("div");
+                                itemDiv.className = "history-item " + (label.toLowerCase().replace(" ", ""));
+                                
+                                const labelSpan = document.createElement("span");
+                                labelSpan.className = "event-label";
+                                labelSpan.innerText = label + " ENTERED";
+                                
+                                const timeSpan = document.createElement("span");
+                                timeSpan.className = "event-time";
+                                timeSpan.innerText = timeVal;
+                                
+                                itemDiv.appendChild(labelSpan);
+                                itemDiv.appendChild(timeSpan);
+                                historyLogElement.appendChild(itemDiv);
+                            }
+                        } else {
+                            historyLogElement.innerHTML = '<div class="history-empty">Chưa có dữ liệu ghi nhận...</div>';
                         }
                     } catch (e) {
                         console.error("Lỗi parse JSON:", e);
