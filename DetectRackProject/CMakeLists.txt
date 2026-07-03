@@ -33,7 +33,7 @@ set(SOURCES
     src/RegionMonitor.cpp
 )
 
-# Executable
+# Executab
 add_executable(${PROJECT_NAME} ${SOURCES})
 
 # Link OpenCV, libmodbus, ixwebsocket, and Windows socket dependencies
