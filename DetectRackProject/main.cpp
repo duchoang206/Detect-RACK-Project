@@ -7,15 +7,15 @@
 #include <iostream>
 #include <mutex>
 #include <opencv2/opencv.hpp>
+#include <set>
 #include <string>
 #include <thread>
 #include <vector>
-#include <set>
 
 // Networking Headers
-#include <ixwebsocket/IXWebSocketServer.h>
-#include <ixwebsocket/IXWebSocket.h>
 #include <ixwebsocket/IXNetSystem.h>
+#include <ixwebsocket/IXWebSocket.h>
+#include <ixwebsocket/IXWebSocketServer.h>
 #include <modbus/modbus.h>
 
 #ifdef _WIN32
@@ -26,29 +26,26 @@
 // KHU VỰC CẤU HÌNH HỆ THỐNG - DÀNH CHO KHÁCH HÀNG SỬA IP / CỔNG MẠNG
 // ============================================================================
 
-// 1. Địa chỉ luồng RTSP của Camera AI (Khách hàng sửa địa chỉ IP 192.168.5.201 tại đây nếu đổi camera)
-const std::string DEFAULT_CAMERA_RTSP = "rtsp://admin:rtc%402025@192.168.5.201:554/cam/realmonitor?channel=1&subtype=0";
+// 1. Địa chỉ luồng RTSP của Camera AI (Khách hàng sửa địa chỉ IP 192.168.5.201
+// tại đây nếu đổi camera)
+const std::string DEFAULT_CAMERA_RTSP =
+    "rtsp://admin:rtc%402025@192.168.5.201:554/cam/"
+    "realmonitor?channel=1&subtype=0";
 
 // 2. Đường dẫn đến file weights mô hình YOLOv8 (.onnx)
 const std::string DEFAULT_MODEL_PATH = "weights/best.onnx";
 
 // 3. Cấu hình cổng kết nối mạng LAN cho thiết bị ngoại vi
-const int MODBUS_PORT = 502;          // Cổng Modbus TCP gửi dữ liệu cho PLC/AGV (Mặc định: 502)
-const int WEBSOCKET_PORT = 8082;      // Cổng truyền phát video và alarm cho Web Dashboard (Mặc định: 8082)
+const int MODBUS_PORT =
+    502; // Cổng Modbus TCP gửi dữ liệu cho PLC/AGV (Mặc định: 502)
+const int WEBSOCKET_PORT =
+    8082; // Cổng truyền phát video và alarm cho Web Dashboard (Mặc định: 8082)
 
 // 4. Tọa độ các đa giác ROI (Hình bình hành giám sát khu vực đặt Rack)
-std::vector<cv::Point> g_pts1 = {
-    cv::Point(1154, 414),
-    cv::Point(1297, 347),
-    cv::Point(1440, 406),
-    cv::Point(1297, 473)
-};
-std::vector<cv::Point> g_pts2 = {
-    cv::Point(1476, 427),
-    cv::Point(1655, 512),
-    cv::Point(1520, 575),
-    cv::Point(1341, 490)
-};
+std::vector<cv::Point> g_pts1 = {cv::Point(1168, 391), cv::Point(1296, 344),
+                                 cv::Point(1444, 405), cv::Point(1300, 460)};
+std::vector<cv::Point> g_pts2 = {cv::Point(1476, 427), cv::Point(1655, 512),
+                                 cv::Point(1520, 575), cv::Point(1341, 490)};
 
 // ============================================================================
 
@@ -80,7 +77,8 @@ bool isValidRackArea(const cv::Rect &box) {
 
 // Cải thiện độ tương phản ảnh camera (CLAHE)
 cv::Mat enhanceContrast(const cv::Mat &src) {
-  if (src.empty()) return src;
+  if (src.empty())
+    return src;
   cv::Mat lab, dst;
   cv::cvtColor(src, lab, cv::COLOR_BGR2Lab);
   std::vector<cv::Mat> planes(3);
@@ -95,26 +93,30 @@ cv::Mat enhanceContrast(const cv::Mat &src) {
 // Gửi log sự kiện khi trạng thái thay đổi
 void reportToServer(const std::string &roiName, bool hasRack) {
   std::cout << "[REPORT] " << roiName << " thay đổi trạng thái: "
-            << (hasRack ? "CÓ RACK (OCCUPIED)" : "TRỐNG (EMPTY)")
-            << std::endl;
+            << (hasRack ? "CÓ RACK (OCCUPIED)" : "TRỐNG (EMPTY)") << std::endl;
 }
 
 // Kiểm tra va chạm giữa đối tượng Rack phát hiện bởi YOLO và vùng đa giác ROI
 bool checkPolygonIntersection(const std::vector<cv::Point> &polygon,
                               const std::vector<Detection> &detections) {
-  if (polygon.empty() || detections.empty()) return false;
+  if (polygon.empty() || detections.empty())
+    return false;
 
   std::vector<cv::Point2f> polyF;
   polyF.reserve(polygon.size());
-  for (const auto &p : polygon) polyF.push_back(cv::Point2f(p.x, p.y));
+  for (const auto &p : polygon)
+    polyF.push_back(cv::Point2f(p.x, p.y));
 
   double polyArea = cv::contourArea(polyF);
-  if (polyArea <= 0) return false;
+  if (polyArea <= 0)
+    return false;
 
   for (const auto &det : detections) {
     // Cách 1: Tâm dưới của bounding box nằm trong đa giác
-    cv::Point bottomCenter(det.box.x + det.box.width / 2, det.box.y + det.box.height);
-    if (cv::pointPolygonTest(polygon, cv::Point2f(bottomCenter.x, bottomCenter.y), false) >= 0) {
+    cv::Point bottomCenter(det.box.x + det.box.width / 2,
+                           det.box.y + det.box.height);
+    if (cv::pointPolygonTest(
+            polygon, cv::Point2f(bottomCenter.x, bottomCenter.y), false) >= 0) {
       return true;
     }
 
@@ -123,10 +125,10 @@ bool checkPolygonIntersection(const std::vector<cv::Point> &polygon,
         cv::Point2f(det.box.x, det.box.y),
         cv::Point2f(det.box.x + det.box.width, det.box.y),
         cv::Point2f(det.box.x + det.box.width, det.box.y + det.box.height),
-        cv::Point2f(det.box.x, det.box.y + det.box.height)
-    };
+        cv::Point2f(det.box.x, det.box.y + det.box.height)};
     std::vector<cv::Point2f> intersection;
-    float intersectArea = cv::intersectConvexConvex(polyF, rectF, intersection, true);
+    float intersectArea =
+        cv::intersectConvexConvex(polyF, rectF, intersection, true);
     if ((intersectArea / polyArea) > 0.40f) {
       return true;
     }
@@ -137,7 +139,7 @@ bool checkPolygonIntersection(const std::vector<cv::Point> &polygon,
 // ==========================================
 // LUỒNG 1: CAMERA GRABBING (Lấy khung hình thô từ Camera)
 // ==========================================
-void cameraThreadFunc(CameraStream* camera) {
+void cameraThreadFunc(CameraStream *camera) {
   cv::Mat tempFrame;
   while (g_running) {
     if (camera->retrieveFrame(tempFrame)) {
@@ -155,7 +157,8 @@ void cameraThreadFunc(CameraStream* camera) {
 // ==========================================
 // LUỒNG 2: AI CORE (Chạy mô hình YOLOv8 và kiểm tra ROI)
 // ==========================================
-void aiCoreThreadFunc(YOLOv8Detector* detector, RegionMonitor* monitor1, RegionMonitor* monitor2) {
+void aiCoreThreadFunc(YOLOv8Detector *detector, RegionMonitor *monitor1,
+                      RegionMonitor *monitor2) {
   cv::Mat localFrame;
   bool prevOccupied1 = false;
   bool prevOccupied2 = false;
@@ -220,30 +223,36 @@ void aiCoreThreadFunc(YOLOv8Detector* detector, RegionMonitor* monitor1, RegionM
 void websocketThreadFunc() {
   ix::WebSocketServer server(WEBSOCKET_PORT, "0.0.0.0");
 
-  server.setOnConnectionCallback([](std::weak_ptr<ix::WebSocket> webSocket,
-                                    std::shared_ptr<ix::ConnectionState> connectionState) {
-    auto ws = webSocket.lock();
-    if (ws) {
-      {
-        std::lock_guard<std::mutex> lock(g_wsClientsMutex);
-        g_wsClients.insert(ws);
-      }
-      std::cout << "[WebSocket] Thiết bị kết nối: " << connectionState->getRemoteIp() << std::endl;
+  server.setOnConnectionCallback(
+      [](std::weak_ptr<ix::WebSocket> webSocket,
+         std::shared_ptr<ix::ConnectionState> connectionState) {
+        auto ws = webSocket.lock();
+        if (ws) {
+          {
+            std::lock_guard<std::mutex> lock(g_wsClientsMutex);
+            g_wsClients.insert(ws);
+          }
+          std::cout << "[WebSocket] Thiết bị kết nối: "
+                    << connectionState->getRemoteIp() << std::endl;
 
-      ws->setOnMessageCallback([webSocket](const ix::WebSocketMessagePtr& msg) {
-        if (msg->type == ix::WebSocketMessageType::Close || msg->type == ix::WebSocketMessageType::Error) {
-          std::lock_guard<std::mutex> lock(g_wsClientsMutex);
-          auto wsShared = webSocket.lock();
-          if (wsShared) g_wsClients.erase(wsShared);
-          std::cout << "[WebSocket] Thiết bị ngắt kết nối." << std::endl;
+          ws->setOnMessageCallback([webSocket](
+                                       const ix::WebSocketMessagePtr &msg) {
+            if (msg->type == ix::WebSocketMessageType::Close ||
+                msg->type == ix::WebSocketMessageType::Error) {
+              std::lock_guard<std::mutex> lock(g_wsClientsMutex);
+              auto wsShared = webSocket.lock();
+              if (wsShared)
+                g_wsClients.erase(wsShared);
+              std::cout << "[WebSocket] Thiết bị ngắt kết nối." << std::endl;
+            }
+          });
         }
       });
-    }
-  });
 
   auto res = server.listen();
   if (!res.first) {
-    std::cerr << "[WebSocket] Lỗi khởi động server: " << res.second << std::endl;
+    std::cerr << "[WebSocket] Lỗi khởi động server: " << res.second
+              << std::endl;
     return;
   }
 
@@ -261,13 +270,15 @@ void websocketThreadFunc() {
       r2 = roi_2_alarm;
     }
 
-    std::string jsonStr = "{\"roi_1_alarm\": " + std::string(r1 ? "true" : "false") +
-                          ", \"roi_2_alarm\": " + std::string(r2 ? "true" : "false") + "}";
+    std::string jsonStr =
+        "{\"roi_1_alarm\": " + std::string(r1 ? "true" : "false") +
+        ", \"roi_2_alarm\": " + std::string(r2 ? "true" : "false") + "}";
 
     cv::Mat localFrame;
     {
       std::lock_guard<std::mutex> lock(g_bufferMutex);
-      if (!g_sharedFrame.empty()) localFrame = g_sharedFrame.clone();
+      if (!g_sharedFrame.empty())
+        localFrame = g_sharedFrame.clone();
     }
 
     std::vector<uchar> localJpeg;
@@ -298,18 +309,24 @@ void websocketThreadFunc() {
                   cv::FONT_HERSHEY_SIMPLEX, 0.6, color2, 2);
 
       // Trạng thái góc trái
-      std::string statusText1 = "ROI 1: " + std::string(r1 ? "OCCUPIED" : "SAFE");
-      std::string statusText2 = "ROI 2: " + std::string(r2 ? "OCCUPIED" : "SAFE");
-      cv::putText(localFrame, statusText1, cv::Point(30, 40), cv::FONT_HERSHEY_SIMPLEX, 0.75, color1, 2);
-      cv::putText(localFrame, statusText2, cv::Point(30, 70), cv::FONT_HERSHEY_SIMPLEX, 0.75, color2, 2);
+      std::string statusText1 =
+          "ROI 1: " + std::string(r1 ? "OCCUPIED" : "SAFE");
+      std::string statusText2 =
+          "ROI 2: " + std::string(r2 ? "OCCUPIED" : "SAFE");
+      cv::putText(localFrame, statusText1, cv::Point(30, 40),
+                  cv::FONT_HERSHEY_SIMPLEX, 0.75, color1, 2);
+      cv::putText(localFrame, statusText2, cv::Point(30, 70),
+                  cv::FONT_HERSHEY_SIMPLEX, 0.75, color2, 2);
 
       // Hiển thị FPS
       if (streamFps > 0.0) {
         std::string fpsText = cv::format("FPS: %.1f", streamFps);
         cv::putText(localFrame, fpsText, cv::Point(16, localFrame.rows - 16),
-                    cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 0), 2, cv::LINE_AA);
+                    cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 0), 2,
+                    cv::LINE_AA);
         cv::putText(localFrame, fpsText, cv::Point(15, localFrame.rows - 17),
-                    cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 1, cv::LINE_AA);
+                    cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 255, 255), 1,
+                    cv::LINE_AA);
       }
 
       // Nén ảnh chất lượng cao 960x540
@@ -324,10 +341,11 @@ void websocketThreadFunc() {
     {
       std::lock_guard<std::mutex> lock(g_wsClientsMutex);
       if (!g_wsClients.empty()) {
-        for (auto& ws : g_wsClients) {
+        for (auto &ws : g_wsClients) {
           ws->sendText(jsonStr);
           if (hasFrame && !localJpeg.empty()) {
-            std::string binaryData(reinterpret_cast<char*>(localJpeg.data()), localJpeg.size());
+            std::string binaryData(reinterpret_cast<char *>(localJpeg.data()),
+                                   localJpeg.size());
             ws->sendBinary(binaryData);
           }
         }
@@ -365,12 +383,14 @@ void modbusThreadFunc() {
     return;
   }
 
-  std::cout << "[Modbus] Server đang lắng nghe ở cổng " << MODBUS_PORT << "..." << std::endl;
+  std::cout << "[Modbus] Server đang lắng nghe ở cổng " << MODBUS_PORT << "..."
+            << std::endl;
 
   while (g_running) {
     int client_socket = modbus_tcp_accept(ctx, &server_socket);
     if (client_socket == -1) {
-      if (!g_running) break;
+      if (!g_running)
+        break;
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
       continue;
     }
@@ -416,10 +436,13 @@ int main(int argc, char *argv[]) {
 
   std::string videoSource = DEFAULT_CAMERA_RTSP;
   std::string modelPath = DEFAULT_MODEL_PATH;
-  if (argc > 1) videoSource = argv[1];
-  if (argc > 2) modelPath = argv[2];
+  if (argc > 1)
+    videoSource = argv[1];
+  if (argc > 2)
+    modelPath = argv[2];
 
-  if (!std::filesystem::exists(modelPath) && std::filesystem::exists("../" + modelPath)) {
+  if (!std::filesystem::exists(modelPath) &&
+      std::filesystem::exists("../" + modelPath)) {
     modelPath = "../" + modelPath;
   }
 
@@ -441,15 +464,21 @@ int main(int argc, char *argv[]) {
   // Khởi tạo vùng giám sát cho RegionMonitor từ tọa độ ROI đã khai báo
   RegionMonitor monitor1;
   cv::Rect roiRect1 = cv::boundingRect(g_pts1);
-  monitor1.handleMouseCallback(cv::EVENT_LBUTTONDOWN, roiRect1.x, roiRect1.y, 0);
-  monitor1.handleMouseCallback(cv::EVENT_MOUSEMOVE, roiRect1.x + roiRect1.width, roiRect1.y + roiRect1.height, 0);
-  monitor1.handleMouseCallback(cv::EVENT_LBUTTONUP, roiRect1.x + roiRect1.width, roiRect1.y + roiRect1.height, 0);
+  monitor1.handleMouseCallback(cv::EVENT_LBUTTONDOWN, roiRect1.x, roiRect1.y,
+                               0);
+  monitor1.handleMouseCallback(cv::EVENT_MOUSEMOVE, roiRect1.x + roiRect1.width,
+                               roiRect1.y + roiRect1.height, 0);
+  monitor1.handleMouseCallback(cv::EVENT_LBUTTONUP, roiRect1.x + roiRect1.width,
+                               roiRect1.y + roiRect1.height, 0);
 
   RegionMonitor monitor2;
   cv::Rect roiRect2 = cv::boundingRect(g_pts2);
-  monitor2.handleMouseCallback(cv::EVENT_LBUTTONDOWN, roiRect2.x, roiRect2.y, 0);
-  monitor2.handleMouseCallback(cv::EVENT_MOUSEMOVE, roiRect2.x + roiRect2.width, roiRect2.y + roiRect2.height, 0);
-  monitor2.handleMouseCallback(cv::EVENT_LBUTTONUP, roiRect2.x + roiRect2.width, roiRect2.y + roiRect2.height, 0);
+  monitor2.handleMouseCallback(cv::EVENT_LBUTTONDOWN, roiRect2.x, roiRect2.y,
+                               0);
+  monitor2.handleMouseCallback(cv::EVENT_MOUSEMOVE, roiRect2.x + roiRect2.width,
+                               roiRect2.y + roiRect2.height, 0);
+  monitor2.handleMouseCallback(cv::EVENT_LBUTTONUP, roiRect2.x + roiRect2.width,
+                               roiRect2.y + roiRect2.height, 0);
 
   // Kích hoạt các luồng chạy song song
   std::thread grabThread(cameraThreadFunc, &camera);
@@ -495,10 +524,14 @@ int main(int argc, char *argv[]) {
       cv::putText(localFrame, "ROI 2", cv::Point(g_pts2[0].x, g_pts2[0].y - 8),
                   cv::FONT_HERSHEY_SIMPLEX, 0.6, color2, 2);
 
-      std::string statusText1 = "ROI 1: " + std::string(r1 ? "OCCUPIED" : "SAFE");
-      std::string statusText2 = "ROI 2: " + std::string(r2 ? "OCCUPIED" : "SAFE");
-      cv::putText(localFrame, statusText1, cv::Point(30, 40), cv::FONT_HERSHEY_SIMPLEX, 0.75, color1, 2);
-      cv::putText(localFrame, statusText2, cv::Point(30, 70), cv::FONT_HERSHEY_SIMPLEX, 0.75, color2, 2);
+      std::string statusText1 =
+          "ROI 1: " + std::string(r1 ? "OCCUPIED" : "SAFE");
+      std::string statusText2 =
+          "ROI 2: " + std::string(r2 ? "OCCUPIED" : "SAFE");
+      cv::putText(localFrame, statusText1, cv::Point(30, 40),
+                  cv::FONT_HERSHEY_SIMPLEX, 0.75, color1, 2);
+      cv::putText(localFrame, statusText2, cv::Point(30, 70),
+                  cv::FONT_HERSHEY_SIMPLEX, 0.75, color2, 2);
 
       cv::imshow(winName, localFrame);
     }
@@ -513,10 +546,14 @@ int main(int argc, char *argv[]) {
   g_running = false;
 
   std::cout << "[Shutdown] Đang dừng tất cả các luồng..." << std::endl;
-  if (grabThread.joinable()) grabThread.join();
-  if (aiThread.joinable()) aiThread.join();
-  if (wsThread.joinable()) wsThread.join();
-  if (modbusThread.joinable()) modbusThread.join();
+  if (grabThread.joinable())
+    grabThread.join();
+  if (aiThread.joinable())
+    aiThread.join();
+  if (wsThread.joinable())
+    wsThread.join();
+  if (modbusThread.joinable())
+    modbusThread.join();
 
   camera.stop();
   cv::destroyAllWindows();
