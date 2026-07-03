@@ -1,4 +1,4 @@
-# - Try to find libmodbus
+# - Try to find libmodbus.
 # Once done this will define
 #
 #  libmodbus_FOUND - system has libmodbus
