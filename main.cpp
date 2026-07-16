@@ -528,6 +528,24 @@ int main(int argc, char *argv[]) {
 
   std::string videoSource = g_config.camera_source;
   std::string modelPath = g_config.weights_path;
+
+  // --- TỰ ĐỘNG TÌM FILE .ONNX TRONG THƯ MỤC weights ---
+  std::string weightsDir = "weights";
+  if (!std::filesystem::exists(weightsDir) && std::filesystem::exists("../weights")) {
+    weightsDir = "../weights";
+  }
+  
+  if (std::filesystem::exists(weightsDir)) {
+    for (const auto& entry : std::filesystem::directory_iterator(weightsDir)) {
+      if (entry.path().extension() == ".onnx") {
+        modelPath = entry.path().string();
+        std::cout << "[INFO] Tự động load file weights: " << modelPath << std::endl;
+        break; // Lấy file .onnx đầu tiên tìm thấy
+      }
+    }
+  }
+  // ---------------------------------------------------
+
   if (argc > 1)
     videoSource = argv[1];
   if (argc > 2)
