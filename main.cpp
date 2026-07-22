@@ -190,6 +190,10 @@ void aiCoreThreadFunc(YOLOv8Detector *detector, RegionMonitor *monitor1,
   cv::Mat localFrame;
   bool prevOccupied1 = false;
   bool prevOccupied2 = false;
+  int emptyFrames1 = 0;
+  int emptyFrames2 = 0;
+
+  const int releaseFrameThreshold = 3;
 
   while (g_running) {
     bool process = false;
@@ -213,8 +217,29 @@ void aiCoreThreadFunc(YOLOv8Detector *detector, RegionMonitor *monitor1,
         }
       }
 
-      bool isOccupied1 = checkPolygonIntersection(g_config.roi_1, validDets);
-      bool isOccupied2 = checkPolygonIntersection(g_config.roi_2, validDets);
+      bool rawOccupied1 = checkPolygonIntersection(g_config.roi_1, validDets);
+      bool rawOccupied2 = checkPolygonIntersection(g_config.roi_2, validDets);
+
+      bool isOccupied1 = prevOccupied1;
+      bool isOccupied2 = prevOccupied2;
+
+      if (rawOccupied1) {
+        emptyFrames1 = 0;
+        isOccupied1 = true;
+      } else {
+        if (++emptyFrames1 >= releaseFrameThreshold) {
+          isOccupied1 = false;
+        }
+      }
+
+      if (rawOccupied2) {
+        emptyFrames2 = 0;
+        isOccupied2 = true;
+      } else {
+        if (++emptyFrames2 >= releaseFrameThreshold) {
+          isOccupied2 = false;
+        }
+      }
 
       monitor1->checkIntersection(validDets);
       monitor2->checkIntersection(validDets);

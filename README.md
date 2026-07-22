@@ -341,3 +341,14 @@ git clone https://github.com/duchoang206/Detect-RACK-Project.git
 cd Detect-RACK-Project
 
 ./start.sh
+
+
+Bây giờ (Khi sửa chuẩn Phương án C):
+
+    Bỏ sleep thừa.
+
+    Nhả Mutex ngay sau khi copy ảnh (với clone()).
+
+    Chủ động "xả sạch" Buffer của Camera Driver (chỉ lấy frame mới nhất cắm trực tiếp từ card capture).
+
+    Mã hóa JPEG độc lập BÊN NGOÀI Mutex.
