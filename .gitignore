@@ -1,8 +1,14 @@
+# Thư mục build và file biên dịch trung gian
 build/
 .vscode/
 *.exe
+*.o
+
+# File media test
 *.mp4
-weights/
+
+# Thư viện bên thứ ba (chứa file .so nặng >100MB)
 third_party/
-cuda_libs/
-*.onnx
+
+# LƯU Ý: Thư mục weights/ và file *.onnx không bị chặn tại đây
+# (Đã được quản lý bằng Git LFS để người clone về chạy được ngay)
