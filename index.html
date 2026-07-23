@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Camera Dashboard - Monitor</title>
+    <!-- Google Fonts: Outfit for sleek modern look, Rajdhani for industrial/tech feel -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #ffffff;
+            --panel-bg: #ffffff;
+            --panel-border: rgba(43, 75, 155, 0.2);
+
+            --text-primary: #2b4b9b;
+            --text-secondary: #475569;
+
+            /* Curated industrial color tokens */
+            --safe-color: #059669;
+            --safe-glow: rgba(5, 150, 105, 0.25);
+
+            --alarm-color: #F15A29;
+            --alarm-glow: rgba(241, 90, 41, 0.35);
+
+            --accent-blue: #2b4b9b;
+            --accent-glow: rgba(43, 75, 155, 0.3);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow-x: hidden;
+            background-image:
+                radial-gradient(circle at 5% 10%, rgba(43, 75, 155, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 95% 90%, rgba(241, 90, 41, 0.05) 0%, transparent 50%),
+                linear-gradient(rgba(43, 75, 155, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(43, 75, 155, 0.05) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+            padding: 20px;
+        }
+
+        #container {
+            width: 100%;
+            max-width: 1200px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid var(--panel-border);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Ambient scanline overlay */
+        #container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(255, 255, 255, 0) 50%, rgba(0, 0, 0, 0.03) 50%);
+            background-size: 100% 4px;
+            z-index: 10;
+            opacity: 0.1;
+            pointer-events: none;
+        }
+
+        /* Header Layout */
+        .header-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid rgba(43, 75, 155, 0.1);
+        }
+
+        .logo-container {
+            height: 50px;
+            display: flex;
+            align-items: center;
+        }
+
+        .company-logo {
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 0;
+            text-align: center;
+            flex: 1;
+            color: var(--alarm-color);
+        }
+
+        .header-meta {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--accent-blue);
+            text-shadow: 0 0 8px var(--accent-glow);
+            text-transform: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            -webkit-text-fill-color: var(--accent-blue);
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--alarm-color);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--alarm-color);
+            animation: pulse-dot 1.5s infinite;
+        }
+
+        /* Layout Grid for Side-by-Side Presentation */
+        .dashboard-content {
+            display: grid;
+            grid-template-columns: 2.2fr 1fr;
+            gap: 20px;
+            align-items: stretch;
+        }
+
+        /* Stream Container & HUD */
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            background-color: #e2e8f0;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            aspect-ratio: 16/9;
+        }
+
+        #videoStream {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            position: relative;
+            z-index: 1;
+            transition: opacity 0.5s ease;
+        }
+
+        /* Cyberpunk corner lines */
+        .corners {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .corners::before,
+        .corners::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--accent-cyan);
+            opacity: 0.7;
+        }
+
+        /* Top Left and Bottom Right */
+        .corners::before {
+            top: 15px;
+            left: 15px;
+            border-right: 0;
+            border-bottom: 0;
+        }
+
+        .corners::after {
+            bottom: 15px;
+            right: 15px;
+            border-left: 0;
+            border-top: 0;
+        }
+
+        /* Top Right and Bottom Left secondary corners */
+        .corners-secondary {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .corners-secondary::before,
+        .corners-secondary::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--accent-cyan);
+            opacity: 0.7;
+        }
+
+        .corners-secondary::before {
+            top: 15px;
+            right: 15px;
+            border-left: 0;
+            border-bottom: 0;
+        }
+
+        .corners-secondary::after {
+            bottom: 15px;
+            left: 15px;
+            border-right: 0;
+            border-top: 0;
+        }
+
+        /* Industrial HUD Text overlays */
+        .hud-overlay {
+            position: absolute;
+            top: 20px;
+            left: 40px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.8rem;
+            color: rgba(0, 0, 0, 0.6);
+            z-index: 2;
+            pointer-events: none;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+            font-weight: 600;
+        }
+
+        .hud-overlay.right {
+            left: auto;
+            right: 40px;
+            text-align: right;
+        }
+
+        .hud-overlay.bottom {
+            top: auto;
+            bottom: 20px;
+            font-size: 0.75rem;
+            color: rgba(0, 0, 0, 0.5);
+        }
+
+        .hud-overlay.bottom-right {
+            top: auto;
+            left: auto;
+            bottom: 20px;
+            right: 40px;
+            font-size: 0.75rem;
+            color: rgba(0, 0, 0, 0.5);
+        }
+
+        /* Right column container */
+        .right-column {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            height: 100%;
+        }
+
+        /* Status Box and Cards (Stacked Vertically on Desktop) */
+        .status-box {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            flex: 1;
+        }
+
+        .status {
+            flex: 1;
+            padding: 20px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid var(--panel-border);
+            background: rgba(0, 0, 0, 0.02);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Sub-info in Status Card */
+        .status::before {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.75rem;
+            font-weight: 600;
+            opacity: 0.7;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+        }
+
+        #roi1::before {
+            content: 'MODBUS: COIL 0';
+        }
+
+        #roi2::before {
+            content: 'MODBUS: COIL 1';
+        }
+
+        /* SAFE STATE Styles */
+        .status.safe {
+            border-color: rgba(5, 150, 105, 0.4);
+            background: linear-gradient(135deg, rgba(5, 150, 105, 0.1), rgba(5, 150, 105, 0.02));
+            color: var(--safe-color);
+            box-shadow: 0 0 15px rgba(5, 150, 105, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+        }
+
+        .status.safe::after {
+            content: '';
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: var(--safe-color);
+            border-radius: 50%;
+            top: 15px;
+            right: 15px;
+            box-shadow: 0 0 10px var(--safe-color);
+        }
+
+        /* ALARM STATE Styles */
+        .status.alarm {
+            border-color: rgba(220, 38, 38, 0.5);
+            background: linear-gradient(135deg, rgba(220, 38, 38, 0.15), rgba(220, 38, 38, 0.02));
+            color: var(--alarm-color);
+            box-shadow: 0 0 20px rgba(220, 38, 38, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+            animation: card-alert-pulse 2s infinite ease-in-out;
+        }
+
+        .status.alarm::after {
+            content: '';
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: var(--alarm-color);
+            border-radius: 50%;
+            top: 15px;
+            right: 15px;
+            box-shadow: 0 0 10px var(--alarm-color);
+            animation: pulse-dot 1s infinite alternate;
+        }
+
+        /* Footer */
+        .dashboard-footer {
+            margin-top: 25px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            letter-spacing: 0.5px;
+            text-align: center;
+        }
+
+        /* Animations */
+        @keyframes pulse-dot {
+            0% {
+                transform: scale(0.95);
+                opacity: 0.6;
+            }
+
+            100% {
+                transform: scale(1.15);
+                opacity: 1;
+            }
+        }
+
+        @keyframes card-alert-pulse {
+
+            0%,
+            100% {
+                border-color: rgba(220, 38, 38, 0.4);
+                box-shadow: 0 0 20px rgba(220, 38, 38, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+            }
+
+            50% {
+                border-color: rgba(220, 38, 38, 0.8);
+                box-shadow: 0 0 35px rgba(220, 38, 38, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+            }
+        }
+
+        /* Loading Spinner */
+        .loader-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.85) 0%, rgba(240, 244, 248, 0.95) 100%);
+            z-index: 5;
+            color: var(--text-secondary);
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.85rem;
+            letter-spacing: 2px;
+            transition: opacity 0.5s ease;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 2px solid rgba(2, 132, 199, 0.1);
+            border-top: 2px solid var(--accent-cyan);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 900px) {
+            .dashboard-content {
+                grid-template-columns: 1fr;
+            }
+
+            .status-box {
+                flex-direction: row;
+                height: auto;
+            }
+
+            .status {
+                height: 120px;
+                flex: 1;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .status-box {
+                flex-direction: column;
+            }
+
+            .status {
+                height: 90px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="container">
+        <div class="header-container">
+            <div class="logo-container">
+                <img src="logo.png" alt="RTC Logo" class="company-logo" onerror="this.style.display='none';">
+            </div>
+            <h2>HỆ THỐNG GIÁM SÁT VẬT THỂ TỰ ĐỘNG</h2>
+            <div class="header-meta">
+                <span class="live-dot"></span> AI LIVE MONITOR
+            </div>
+        </div>
+
+        <div class="dashboard-content">
+            <!-- Left panel: Video Stream -->
+            <div class="video-wrapper">
+                <div class="corners"></div>
+                <div class="corners-secondary"></div>
+
+                <!-- HUD Text Overlays removed -->
+
+                <img id="videoStream" src="" alt="Đang kết nối tới luồng AI Camera..." />
+
+                <div class="loader-container">
+                    <div class="spinner"></div>
+                    <div>AWAITING AI STREAM CONNECTION</div>
+                </div>
+            </div>
+
+            <!-- Right panel: Status Cards -->
+            <div class="right-column">
+                <div class="status-box">
+                    <div id="roi1" class="status safe">ROI 1: SAFE</div>
+                    <div id="roi2" class="status safe">ROI 2: SAFE</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-footer">
+            &copy; 2026 R-SkyView Industrial Edge Server. Thiết kế tối ưu hóa độ trễ, chuẩn vận hành công nghiệp.
+        </div>
+    </div>
+
+    <script>
+        const wsUrl = "ws://" + (window.location.hostname || "192.168.5.103") + ":8082/";
+        const videoElement = document.getElementById("videoStream");
+        const roi1Element = document.getElementById("roi1");
+        const roi2Element = document.getElementById("roi2");
+        const loaderContainer = document.querySelector(".loader-container");
+
+        let ws = null;
+
+        function connect() {
+            console.log("Đang kết nối tới Server AI tại: " + wsUrl);
+            ws = new WebSocket(wsUrl);
+            ws.binaryType = "blob";
+
+            ws.onopen = function () {
+                console.log("Đã kết nối thành công tới Server AI.");
+                loaderContainer.style.display = "none";
+                videoElement.style.opacity = "1";
+            };
+
+            ws.onmessage = function (event) {
+                if (typeof event.data === "string") {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.roi_1_alarm) {
+                            roi1Element.innerText = "ROI 1: OCCUPIED";
+                            roi1Element.className = "status alarm";
+                        } else {
+                            roi1Element.innerText = "ROI 1: SAFE";
+                            roi1Element.className = "status safe";
+                        }
+
+                        if (data.roi_2_alarm) {
+                            roi2Element.innerText = "ROI 2: OCCUPIED";
+                            roi2Element.className = "status alarm";
+                        } else {
+                            roi2Element.innerText = "ROI 2: SAFE";
+                            roi2Element.className = "status safe";
+                        }
+                    } catch (e) {
+                        console.error("Lỗi parse JSON:", e);
+                    }
+                }
+                else if (event.data instanceof Blob) {
+                    const url = URL.createObjectURL(event.data);
+                    const oldUrl = videoElement.src;
+                    videoElement.src = url;
+                    if (oldUrl && oldUrl.startsWith("blob:")) {
+                        URL.revokeObjectURL(oldUrl);
+                    }
+                }
+            };
+
+            ws.onclose = function () {
+                console.log("Mất kết nối tới Server AI. Đang thử kết nối lại sau 2 giây...");
+                roi1Element.innerText = "ROI 1: DISCONNECTED";
+                roi1Element.className = "status alarm";
+                roi2Element.innerText = "ROI 2: DISCONNECTED";
+                roi2Element.className = "status alarm";
+
+                loaderContainer.style.display = "flex";
+                videoElement.style.opacity = "0.05";
+
+                const oldUrl = videoElement.src;
+                videoElement.src = "";
+                if (oldUrl && oldUrl.startsWith("blob:")) {
+                    URL.revokeObjectURL(oldUrl);
+                }
+
+                setTimeout(connect, 2000);
+            };
+
+            ws.onerror = function (error) {
+                console.error("Lỗi kết nối WebSocket:", error);
+            };
+        }
+
+        connect();
+    </script>
+</body>
+
+</html>

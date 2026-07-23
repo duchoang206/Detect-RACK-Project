@@ -331,6 +331,12 @@ Nếu Dashboard báo `OFFLINE` dù server đang chạy, kiểm tra và mở Inbo
 `index.html` gọi `URL.revokeObjectURL()` sau mỗi lần render frame mới, tránh memory leak khi Dashboard chạy liên tục 24/7.
 
 ---
+<<<<<<< HEAD
+=======
+
+
+---
+>>>>>>> 2d46a79a8a0dd4ed98de2a6f0f877ead6a2c5e22
 chmod +x setup.sh start.sh
 ./setup.sh
 
@@ -340,3 +346,15 @@ cd Detect-RACK-Project
 ./start.sh
 
 
+<<<<<<< HEAD
+=======
+Bây giờ (Khi sửa chuẩn Phương án C):
+
+    Bỏ sleep thừa.
+
+    Nhả Mutex ngay sau khi copy ảnh (với clone()).
+
+    Chủ động "xả sạch" Buffer của Camera Driver (chỉ lấy frame mới nhất cắm trực tiếp từ card capture).
+
+    Mã hóa JPEG độc lập BÊN NGOÀI Mutex.
+>>>>>>> 2d46a79a8a0dd4ed98de2a6f0f877ead6a2c5e22
