@@ -15,7 +15,7 @@ After=network.target
 [Service]
 Type=simple
 User=$USER_NAME
-WorkingDirectory="$PROJECT_DIR"
+WorkingDirectory=$PROJECT_DIR
 ExecStart="$PROJECT_DIR/start.sh"
 Restart=always
 RestartSec=5
