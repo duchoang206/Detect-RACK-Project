@@ -361,3 +361,5 @@ Ngược lại, khi nào muốn nó chạy lại, bạn chỉ cần gõ:
 
 bash
 sudo systemctl start detectrack
+lệnh xem lịch sử log 
+sudo journalctl -u detectrack -f
