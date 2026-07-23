@@ -12,3 +12,8 @@ third_party/
 
 # LƯU Ý: Thư mục weights/ và file *.onnx không bị chặn tại đây
 # (Đã được quản lý bằng Git LFS để người clone về chạy được ngay)
+
+mediamtx
+mediamtx.log
+mediamtx.yml
+LICENSE
