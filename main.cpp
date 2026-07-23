@@ -192,6 +192,8 @@ void aiCoreThreadFunc(YOLOv8Detector *detector, RegionMonitor *monitor1,
   bool prevOccupied2 = false;
   int emptyFrames1 = 0;
   int emptyFrames2 = 0;
+  int occupiedFrames1 = 0;
+  int occupiedFrames2 = 0;
 
   const int releaseFrameThreshold = 3;
 
@@ -225,8 +227,11 @@ void aiCoreThreadFunc(YOLOv8Detector *detector, RegionMonitor *monitor1,
 
       if (rawOccupied1) {
         emptyFrames1 = 0;
-        isOccupied1 = true;
+        if (++occupiedFrames1 >= releaseFrameThreshold) {
+          isOccupied1 = true;
+        }
       } else {
+        occupiedFrames1 = 0;
         if (++emptyFrames1 >= releaseFrameThreshold) {
           isOccupied1 = false;
         }
@@ -234,8 +239,11 @@ void aiCoreThreadFunc(YOLOv8Detector *detector, RegionMonitor *monitor1,
 
       if (rawOccupied2) {
         emptyFrames2 = 0;
-        isOccupied2 = true;
+        if (++occupiedFrames2 >= releaseFrameThreshold) {
+          isOccupied2 = true;
+        }
       } else {
+        occupiedFrames2 = 0;
         if (++emptyFrames2 >= releaseFrameThreshold) {
           isOccupied2 = false;
         }
