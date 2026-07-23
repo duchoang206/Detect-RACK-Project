@@ -347,14 +347,17 @@ cd Detect-RACK-Project
 
 
 <<<<<<< HEAD
-=======
-Bây giờ (Khi sửa chuẩn Phương án C):
+Nomachine để dừng phần mềm lại:
 
-    Bỏ sleep thừa.
+bash
+sudo systemctl stop detectrack
+(Sau khi gõ lệnh trên, trang web giám sát sẽ bị ngắt kết nối ngay lập tức).
 
-    Nhả Mutex ngay sau khi copy ảnh (với clone()).
+Nếu bạn muốn tắt vĩnh viễn (không cho nó tự động bật lên mỗi khi khởi động lại máy tính nữa), thì hãy gõ thêm lệnh này:
 
-    Chủ động "xả sạch" Buffer của Camera Driver (chỉ lấy frame mới nhất cắm trực tiếp từ card capture).
+bash
+sudo systemctl disable detectrack
+Ngược lại, khi nào muốn nó chạy lại, bạn chỉ cần gõ:
 
-    Mã hóa JPEG độc lập BÊN NGOÀI Mutex.
->>>>>>> 2d46a79a8a0dd4ed98de2a6f0f877ead6a2c5e22
+bash
+sudo systemctl start detectrack
