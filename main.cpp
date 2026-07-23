@@ -568,71 +568,8 @@ int main(int argc, char *argv[]) {
   std::thread wsThread(websocketThreadFunc);
   std::thread modbusThread(modbusThreadFunc);
 
-  std::string winName = "DetectRackProject - Live Server Debug Monitor";
-  cv::namedWindow(winName, cv::WINDOW_AUTOSIZE);
-
-  cv::Mat localFrame;
-
   while (g_running) {
-    bool hasNewGui = false;
-    {
-      std::lock_guard<std::mutex> lock(g_guiMutex);
-      if (g_guiNewFrame) {
-        localFrame = g_guiFrame.clone();
-        g_guiNewFrame = false;
-        hasNewGui = true;
-      }
-    }
-
-    if (hasNewGui && !localFrame.empty()) {
-      bool r1 = false, r2 = false;
-      {
-        std::lock_guard<std::mutex> lock(g_alarmMutex);
-        r1 = roi_1_alarm;
-        r2 = roi_2_alarm;
-      }
-
-      std::vector<Detection> localDets;
-      {
-        std::lock_guard<std::mutex> lock(g_detsMutex);
-        localDets = g_latestDets;
-      }
-
-      for (const auto& d : localDets) {
-        cv::rectangle(localFrame, d.box, cv::Scalar(255, 165, 0), 2);
-        cv::putText(localFrame, d.className + " " + cv::format("%.2f", d.confidence), 
-                    cv::Point(d.box.x, d.box.y - 5), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(255, 165, 0), 2);
-      }
-
-      cv::Scalar color1 = r1 ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0);
-      std::vector<std::vector<cv::Point>> polys1 = {g_config.roi_1};
-      cv::polylines(localFrame, polys1, true, color1, 2);
-      cv::putText(localFrame, "ROI 1", cv::Point(g_config.roi_1[0].x, g_config.roi_1[0].y - 8),
-                  cv::FONT_HERSHEY_SIMPLEX, 0.6, color1, 2);
-
-      cv::Scalar color2 = r2 ? cv::Scalar(0, 0, 255) : cv::Scalar(0, 255, 0);
-      std::vector<std::vector<cv::Point>> polys2 = {g_config.roi_2};
-      cv::polylines(localFrame, polys2, true, color2, 2);
-      cv::putText(localFrame, "ROI 2", cv::Point(g_config.roi_2[0].x, g_config.roi_2[0].y - 8),
-                  cv::FONT_HERSHEY_SIMPLEX, 0.6, color2, 2);
-
-      std::string statusText1 =
-          "ROI 1: " + std::string(r1 ? "OCCUPIED" : "SAFE");
-      std::string statusText2 =
-          "ROI 2: " + std::string(r2 ? "OCCUPIED" : "SAFE");
-      cv::putText(localFrame, statusText1, cv::Point(30, 40),
-                  cv::FONT_HERSHEY_SIMPLEX, 0.75, color1, 2);
-      cv::putText(localFrame, statusText2, cv::Point(30, 70),
-                  cv::FONT_HERSHEY_SIMPLEX, 0.75, color2, 2);
-
-      cv::imshow(winName, localFrame);
-    }
-
-    char key = static_cast<char>(cv::waitKey(1));
-    if (key == 'q' || key == 'Q' || key == 27) {
-      g_running = false;
-      break;
-    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
 
   g_running = false;
@@ -648,7 +585,6 @@ int main(int argc, char *argv[]) {
     modbusThread.join();
 
   camera.stop();
-  cv::destroyAllWindows();
   ix::uninitNetSystem();
 
   std::cout << "[Shutdown] Hoàn thành dọn dẹp hệ thống." << std::endl;
