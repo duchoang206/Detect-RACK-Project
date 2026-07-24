@@ -346,7 +346,7 @@ cd Detect-RACK-Project
 ./start.sh
 
 
-<<<<<<< HEAD
+HEAD
 Nomachine để dừng phần mềm lại:
 
 bash
